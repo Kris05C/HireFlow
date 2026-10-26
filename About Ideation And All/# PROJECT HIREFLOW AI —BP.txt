@@ -1,0 +1,875 @@
+# PROJECT: HIREFLOW AI — SMART RECRUITMENT AUTOMATION PLATFORM BY (Fixr)
+
+Act as a senior full-stack developer, UI/UX designer, software architect, database engineer, and AI application developer.
+
+Build a modern, responsive, production-oriented full-stack recruitment automation web application called **HireFlow AI**.
+
+Tagline: "Find talent. Connect smarter. Hire faster."
+
+The application should help HR executives and recruiters organize candidate information, discover suitable candidates from authorized data sources, create recruitment campaigns, send approved personalized emails, collect voluntary expressions of interest, and manage interested candidates through a centralized dashboard.
+
+This must be a functional full-stack application, not merely a static UI or a frontend prototype.
+
+## 1. CORE OBJECTIVE
+
+Develop a recruitment workflow that reduces repetitive administrative work.
+
+The primary workflow is:
+
+1. HR executive signs in.
+2. HR executive creates a job opportunity.
+3. The system identifies suitable candidates from authorized candidate records.
+4. The recruiter reviews and approves the candidate list.
+5. The recruiter creates and previews a personalized recruitment email campaign.
+6. The system sends approved emails through a configured email provider.
+7. Candidates can voluntarily express interest using a secure response page.
+8. Candidates confirm their contact details and submit the required information.
+9. The backend stores their responses.
+10. Interested candidates automatically appear in the appropriate HR dashboard section.
+11. The recruiter reviews, contacts, and updates each candidate's status.
+
+All sensitive operations must happen on the backend.
+
+## 2. TECHNOLOGY STACK
+
+Use the following stack unless a genuine technical limitation requires a documented alternative.
+
+Frontend:
+- React
+- Vite
+- JavaScript
+- HTML5
+- CSS3
+- Bootstrap 5
+- React Router
+- Fetch API or Axios
+- React Hook Form, if useful
+
+Backend:
+- Node.js
+- Express.js
+- REST API architecture
+
+Database:
+- PostgreSQL
+- Prisma ORM
+
+Authentication:
+- Secure session-based authentication or a well-implemented token-based approach.
+- Secure password hashing.
+- Role-based access control.
+- Protected dashboard routes.
+
+Email:
+- Integrate a transactional email provider such as Resend, SendGrid, or another supported provider.
+- Keep API keys in environment variables.
+- Support email verification and delivery-event webhooks where available.
+
+Background processing:
+- Use a background job queue when necessary for campaign delivery and retries.
+- Implement rate limits and campaign sending limits.
+- Prevent duplicate campaign sends.
+
+Testing:
+- Vitest or Jest for unit tests.
+- Supertest for API integration tests.
+- Playwright for essential end-to-end workflows, if feasible.
+
+Deployment:
+- Frontend: a suitable static hosting provider.
+- Backend: a suitable Node.js hosting provider.
+- Database: a managed PostgreSQL provider.
+
+Use currently supported package versions and document the installation steps.
+
+## 3. USER ROLES
+
+Implement the following roles.
+
+A. ADMIN
+- Manage authorized recruiter accounts.
+- Manage application settings.
+- View permitted system-level analytics.
+- Manage role permissions.
+- Review audit logs.
+
+B. HR EXECUTIVE / RECRUITER
+- Create and manage job opportunities.
+- Search authorized candidate records.
+- Import permitted candidate data.
+- Review candidate matches.
+- Create and manage email campaigns.
+- Review candidate responses.
+- Access assigned candidate records.
+- Update candidate statuses.
+- Export permitted candidate records.
+
+C. CANDIDATE
+- View the relevant job opportunity.
+- Express interest voluntarily.
+- Verify their email address.
+- Submit or confirm contact information.
+- Provide optional professional information.
+- Upload a CV when requested.
+- Withdraw their application or expression of interest.
+- Request correction or deletion of personal information where applicable.
+- Manage recruitment communication preferences.
+
+Candidates should not need an HR dashboard account simply to express interest, but their response links must be securely generated, scoped, and time-limited where appropriate.
+
+## 4. PUBLIC WEBSITE
+
+Create a professional landing page with:
+
+- Modern navigation bar.
+- HireFlow AI logo and branding.
+- Hero section.
+- Main heading: "Recruitment, Without the Repetitive Work."
+- Supporting text explaining candidate organization, recruitment outreach, and interest tracking.
+- Primary CTA: "Get Started".
+- Secondary CTA: "Explore Features".
+- Features section.
+- Recruitment workflow section.
+- Benefits section.
+- Security and privacy section.
+- Footer with contact information, privacy policy, terms, and relevant disclosures.
+
+Do not fabricate testimonials, customer logos, company partnerships, hiring statistics, or performance claims.
+
+The design must be responsive on mobile, tablet, and desktop.
+
+## 5. AUTHENTICATION
+
+Build:
+
+- Recruiter registration, where enabled by the administrator.
+- Login and logout.
+- Password hashing.
+- Password reset.
+- Email verification.
+- Protected routes.
+- Session expiration.
+- Role-based permissions.
+- Rate limiting for authentication endpoints.
+- Audit logging for sensitive actions.
+
+Do not store passwords in plaintext.
+
+Do not place private API keys or sensitive credentials in frontend environment variables.
+
+## 6. HR DASHBOARD
+
+Create a professional dashboard with a sidebar and top navigation.
+
+Navigation:
+
+- Overview
+- Jobs
+- Candidate Discovery
+- Candidates
+- Campaigns
+- Interested Candidates
+- Follow-ups
+- Analytics
+- Settings
+
+Dashboard summary cards should include:
+
+- Active jobs.
+- Candidates in the talent pool.
+- Approved campaign recipients.
+- Emails sent.
+- Confirmed interested candidates.
+- Follow-ups due.
+
+Show recent campaign activity and candidate response activity.
+
+Use charts only when real data is available. For demonstration mode, clearly label all seeded information as sample data.
+
+Add loading states, empty states, error messages, and success notifications.
+
+## 7. JOB MANAGEMENT
+
+Allow recruiters to create, edit, archive, and view job opportunities.
+
+Job fields:
+
+- Job title.
+- Job description.
+- Required skills.
+- Preferred skills.
+- Required experience.
+- Employment type.
+- Work arrangement.
+- Location.
+- Salary range, if available.
+- Application deadline.
+- Recruiter owner.
+- Job status.
+
+Validate all required fields.
+
+Allow filtering and searching by title, skills, location, experience, and status.
+
+## 8. CANDIDATE DISCOVERY
+
+Build a candidate discovery interface using permitted candidate records.
+
+Possible data sources:
+
+- Candidate registrations on HireFlow AI.
+- Authorized CSV imports.
+- Authorized third-party APIs.
+- Other lawfully accessible recruitment databases.
+
+Do not implement unauthorized scraping of professional networks or private websites.
+
+Do not collect private email addresses, phone numbers, facial images, or other personal information from arbitrary websites.
+
+Candidate search filters:
+
+- Name.
+- Job title.
+- Skills.
+- Experience.
+- Preferred location.
+- Job preferences.
+- Availability.
+- Notice period, when provided.
+- Desired employment type.
+
+Display candidates in a searchable table or card layout.
+
+Include:
+- Candidate profile.
+- Declared skills.
+- Experience.
+- Preferred location.
+- Candidate source.
+- Last updated date.
+- Outreach eligibility status.
+- Matching job.
+- Explanation of matching criteria.
+
+Support pagination, sorting, filtering, and duplicate detection.
+
+Do not infer that a person wants to change jobs merely because their profile exists online.
+
+Treat job-seeking status and interest in recruitment communications as separate fields.
+
+## 9. CANDIDATE DATA IMPORT
+
+Allow authorized recruiters to upload CSV files containing candidate records.
+
+Implement:
+- File type validation.
+- File size limits.
+- CSV parsing.
+- Required-column validation.
+- Duplicate detection.
+- Invalid-row reporting.
+- Import preview.
+- Recruiter confirmation before committing records.
+- Import history.
+- Import audit logs.
+
+Do not send recruitment emails immediately after importing a file.
+
+Imported candidates must first pass the application's outreach eligibility checks and be reviewed by an authorized recruiter.
+
+Never treat possession of a contact detail as proof of consent to receive recruitment emails.
+
+## 10. CANDIDATE MATCHING
+
+Create an explainable candidate-matching engine.
+
+For the initial version, implement configurable rule-based matching using:
+
+- Required skills.
+- Preferred skills.
+- Relevant experience.
+- Location preferences.
+- Employment preferences.
+- Job availability preferences, when provided.
+
+Display the match score and the factors contributing to it.
+
+Example:
+
+"85% match: 4 of 5 required skills match, relevant experience is within the requested range, and location preferences align."
+
+Clearly label scores as estimates based on available profile data.
+
+Do not use facial recognition, emotion recognition, inferred personality, protected characteristics, or sensitive personal information to rank candidates.
+
+Do not automatically reject candidates based on an AI-generated score.
+
+Allow the recruiter to inspect the underlying criteria and make the final decision.
+
+Keep advanced AI matching behind a replaceable service interface so an AI API can be integrated later.
+
+## 11. EMAIL CAMPAIGN BUILDER
+
+Build a campaign creation wizard.
+
+Step 1: Select a job opportunity.
+
+Step 2: Select eligible candidate records.
+
+Step 3: Review the recipients and their outreach eligibility.
+
+Step 4: Create an email template.
+
+Step 5: Preview the personalized email.
+
+Step 6: Send a test email.
+
+Step 7: Confirm the campaign.
+
+Step 8: Send immediately or schedule it.
+
+Support template variables such as:
+
+{{first_name}}
+{{job_title}}
+{{company_name}}
+{{location}}
+{{recruiter_name}}
+{{interest_link}}
+
+Add:
+- Email subject.
+- HTML email template.
+- Plain-text alternative.
+- Sender identity.
+- Reply-to address.
+- Unsubscribe or communication-preference link.
+- Campaign status.
+- Delivery status.
+- Retry handling.
+- Failed-email reporting.
+- Duplicate-send prevention.
+
+The system must check the candidate's outreach eligibility, suppression status, and communication preferences before sending.
+
+Require recruiter approval before a campaign is launched.
+
+Implement configurable rate limits and provider sending limits.
+
+Use a background queue for larger campaigns.
+
+Verify email-provider webhook signatures before processing delivery events.
+
+Do not claim an email was delivered merely because a sending API accepted the request.
+
+## 12. CANDIDATE INTEREST PAGE
+
+Every campaign recipient should receive a secure, unique response link.
+
+The response page should display the relevant job details and recruiter identity.
+
+Provide two distinct actions:
+
+- "I'm Interested"
+- "Not Interested"
+
+When the candidate selects "I'm Interested", show a form requesting only the information needed for the recruitment process.
+
+Suggested fields:
+
+- Name.
+- Verified email address.
+- Mobile number, optional unless necessary for the specific next step.
+- Preferred location.
+- Relevant experience.
+- CV upload, if required.
+- Preferred contact time.
+- Optional message.
+
+Ask the candidate to confirm that their submitted information is accurate.
+
+Display a clear privacy notice explaining why the information is collected, who will receive it, and how the candidate can exercise applicable privacy rights.
+
+Use a separate, optional and unbundled preference for future recruitment communications where required.
+
+The initial response must not automatically enroll candidates in unrelated marketing campaigns.
+
+Secure response links with cryptographically strong random tokens, limited scope, expiration where appropriate, and server-side validation.
+
+Do not expose personal information in URL query parameters.
+
+Protect against token replay, duplicate submissions, unauthorized updates, and automated form abuse.
+
+Provide a confirmation page after submission.
+
+Example confirmation:
+
+"Thank you for your response. Your interest has been recorded. An authorized recruiter may contact you regarding this opportunity."
+
+When the candidate selects "Not Interested", update their response status appropriately and do not continue the same recruitment outreach.
+
+Provide a way to report an incorrect or unwanted message.
+
+## 13. INTERESTED CANDIDATES MODULE
+
+Automatically organize candidate responses into categories:
+
+- Interested.
+- Not Interested.
+- Awaiting Details.
+- Contact Requested.
+- Contacted.
+- Interview Scheduled.
+- Offer Stage.
+- Hired.
+- Closed.
+
+Allow authorized recruiters to update statuses manually.
+
+The candidate detail view should show:
+
+- Name.
+- Verified email address.
+- Mobile number, if supplied.
+- Skills.
+- Experience.
+- Relevant job opportunity.
+- Response timestamp.
+- Campaign source.
+- Current status.
+- Assigned recruiter.
+- Recruiter notes.
+- Follow-up date.
+- Communication preferences.
+
+Only display sensitive information to authorized users.
+
+Implement a clear distinction between the candidate's expression of interest and any subsequent application or hiring decision.
+
+## 14. FOLLOW-UP MANAGEMENT
+
+Allow recruiters to schedule follow-up reminders.
+
+Features:
+- Follow-up date and time.
+- Assigned recruiter.
+- Notes.
+- Reminder status.
+- Completed and overdue filters.
+
+Display reminders in the HR dashboard.
+
+Do not automatically send repeated messages to candidates who have opted out, declined contact, or whose outreach eligibility has expired.
+
+Require recruiter review before sending additional follow-ups unless a clearly authorized workflow has been configured.
+
+## 15. DATABASE DESIGN
+
+Create a normalized PostgreSQL schema using Prisma.
+
+Suggested models:
+
+User:
+- id
+- name
+- email
+- passwordHash
+- role
+- status
+- createdAt
+- updatedAt
+
+Candidate:
+- id
+- fullName
+- email
+- emailVerifiedAt
+- mobileNumber
+- skills
+- experienceYears
+- currentJobTitle
+- preferredJobTitle
+- preferredLocations
+- jobPreferences
+- noticePeriod
+- profileSource
+- sourceReference
+- outreachEligibilityStatus
+- createdAt
+- updatedAt
+
+Job:
+- id
+- title
+- description
+- requiredSkills
+- preferredSkills
+- minimumExperience
+- maximumExperience
+- location
+- employmentType
+- salaryRange
+- status
+- recruiterId
+- createdAt
+- updatedAt
+
+Campaign:
+- id
+- name
+- jobId
+- subject
+- template
+- status
+- createdBy
+- scheduledAt
+- startedAt
+- completedAt
+- createdAt
+
+CampaignRecipient:
+- id
+- campaignId
+- candidateId
+- status
+- providerMessageId
+- sentAt
+- deliveredAt
+- bouncedAt
+- createdAt
+
+CandidateResponse:
+- id
+- candidateId
+- jobId
+- campaignRecipientId
+- responseStatus
+- respondedAt
+- updatedAt
+
+CommunicationPreference:
+- id
+- candidateId
+- channel
+- preferenceStatus
+- source
+- recordedAt
+- updatedAt
+
+FollowUp:
+- id
+- candidateId
+- jobId
+- recruiterId
+- dueAt
+- notes
+- status
+- createdAt
+- updatedAt
+
+AuditLog:
+- id
+- actorUserId
+- action
+- entityType
+- entityId
+- createdAt
+
+Add any necessary models for secure response tokens, file metadata, import batches, recruiter assignments, and verification records.
+
+Use proper foreign keys, indexes, uniqueness constraints, and transactions.
+
+Store sensitive information securely.
+
+Avoid placing unnecessary personal information in application logs.
+
+Define a configurable retention and deletion policy.
+
+Do not store raw email-provider API keys or authentication tokens in the database.
+
+## 16. BACKEND API DESIGN
+
+Implement REST endpoints such as:
+
+Authentication:
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+
+Jobs:
+GET /api/jobs
+POST /api/jobs
+GET /api/jobs/:id
+PATCH /api/jobs/:id
+DELETE /api/jobs/:id
+
+Candidates:
+GET /api/candidates
+POST /api/candidates/import
+GET /api/candidates/:id
+PATCH /api/candidates/:id
+GET /api/candidates/:id/history
+
+Matching:
+POST /api/jobs/:id/match-candidates
+
+Campaigns:
+GET /api/campaigns
+POST /api/campaigns
+GET /api/campaigns/:id
+POST /api/campaigns/:id/preview
+POST /api/campaigns/:id/test
+POST /api/campaigns/:id/approve
+POST /api/campaigns/:id/send
+
+Candidate response:
+GET /api/responses/:token
+POST /api/responses/:token/interested
+POST /api/responses/:token/not-interested
+
+Follow-ups:
+GET /api/follow-ups
+POST /api/follow-ups
+PATCH /api/follow-ups/:id
+
+Email-provider webhooks:
+POST /api/webhooks/email-provider
+
+Communication preferences:
+GET /api/preferences
+POST /api/preferences/unsubscribe
+
+Use appropriate HTTP methods and status codes.
+
+Validate request bodies on the server.
+
+Enforce authentication and authorization on every protected endpoint.
+
+Do not rely on frontend checks for access control.
+
+Do not reveal whether an arbitrary email address exists in the system through public authentication or verification endpoints.
+
+Protect all public endpoints against abuse.
+
+## 17. SECURITY REQUIREMENTS
+
+Implement:
+- HTTPS in production.
+- Secure password hashing.
+- Secure cookies when using sessions.
+- CSRF protection where applicable.
+- Input validation.
+- Output encoding.
+- SQL injection protection through safe ORM usage.
+- XSS protection.
+- Rate limiting.
+- Secure CORS configuration.
+- Request size limits.
+- Secure file uploads.
+- Authorization checks.
+- Audit logging.
+- Environment-based secrets.
+- Email webhook signature validation.
+- Secure error handling.
+- Dependency auditing.
+- Backup and recovery documentation.
+
+Never expose private credentials in GitHub.
+
+Provide a .env.example containing placeholder values only.
+
+Do not commit a real .env file.
+
+## 18. PRIVACY AND RESPONSIBLE RECRUITMENT
+
+The application must follow privacy-by-design principles.
+
+Implement:
+- Transparent candidate data sources.
+- Purpose limitation.
+- Data minimization.
+- Candidate communication preferences.
+- Appropriate outreach eligibility checks.
+- Unsubscribe and suppression handling.
+- Candidate data correction and deletion workflows.
+- Access controls.
+- Retention limits.
+- Audit logs.
+- Privacy notices.
+- Secure data export and deletion processes.
+
+Before enabling real recruitment campaigns, require the operator to configure the appropriate lawful basis, privacy disclosures, and outreach permissions for the relevant jurisdictions and data sources.
+
+Do not assume that public professional information permits unrestricted email or phone outreach.
+
+Do not scrape or collect facial images.
+
+Do not build facial recognition or face-based job-seeker identification.
+
+Use voluntary candidate registration, authorized APIs, and appropriately sourced professional records instead.
+
+## 19. USER INTERFACE DESIGN
+
+Create a polished SaaS interface inspired by modern recruitment and CRM products, without copying any company's proprietary interface.
+
+Design direction:
+- Professional and minimal.
+- Clear typography.
+- Consistent spacing.
+- Responsive sidebar.
+- Well-designed cards.
+- Accessible forms.
+- Tables with sorting and pagination.
+- Clean charts.
+- Helpful empty states.
+- Subtle transitions.
+- Clear status badges.
+- Toast notifications.
+- Skeleton loading states.
+
+Create the following pages:
+
+1. Landing page.
+2. Login page.
+3. Registration page.
+4. Dashboard.
+5. Jobs listing.
+6. Create/edit job.
+7. Candidate discovery.
+8. Candidate profile.
+9. Candidate import wizard.
+10. Campaign listing.
+11. Campaign builder.
+12. Campaign analytics.
+13. Interested candidates.
+14. Candidate response page.
+15. Follow-up manager.
+16. Settings.
+17. Privacy and communication-preference pages.
+18. Not-found page.
+
+The application must work properly on mobile devices.
+
+## 20. DEMO MODE
+
+Provide clearly labeled fictional seed data for local development.
+
+Include:
+- Sample recruiters.
+- Sample jobs.
+- Sample candidate profiles.
+- Sample campaigns.
+- Sample candidate responses.
+
+Never use real people's personal information as demo data.
+
+Create a mock email provider for local development.
+
+In mock mode:
+- No external emails are sent.
+- Email content can be previewed.
+- Simulated delivery events can be generated.
+- The complete candidate-interest workflow can be tested.
+
+Require explicit configuration before switching to live email sending.
+
+## 21. TESTING REQUIREMENTS
+
+Write tests for:
+
+- Authentication.
+- Role-based access.
+- Candidate search and filtering.
+- Candidate import validation.
+- Matching calculations.
+- Campaign approval.
+- Outreach eligibility checks.
+- Duplicate-send prevention.
+- Email sending failures.
+- Response-token expiration.
+- Candidate interest submission.
+- Duplicate response prevention.
+- Not-interested handling.
+- Unsubscribe suppression.
+- Candidate access permissions.
+- Data deletion workflows.
+
+Include at least one end-to-end test demonstrating:
+
+Recruiter creates a job → imports fictional candidates → reviews eligible candidates → previews a campaign → approves the campaign → mock emails are generated → a candidate expresses interest → the candidate appears in the Interested Candidates dashboard.
+
+## 22. DEVELOPMENT PROCESS
+
+Build the project incrementally.
+
+Phase 1:
+Set up the repository, React frontend, Express backend, PostgreSQL database, Prisma, and environment configuration.
+
+Phase 2:
+Implement authentication, dashboard layout, jobs, and candidate CRUD operations.
+
+Phase 3:
+Implement CSV imports, candidate filtering, and rule-based matching.
+
+Phase 4:
+Implement campaign creation, email previews, mock delivery, and approval workflows.
+
+Phase 5:
+Implement secure candidate-response links and the Interested Candidates module.
+
+Phase 6:
+Implement communication preferences, audit logs, follow-up reminders, and privacy controls.
+
+Phase 7:
+Implement testing, error handling, deployment configuration, and documentation.
+
+Do not attempt to implement the entire application in one enormous file.
+
+Use a modular directory structure, reusable React components, reusable backend services, centralized validation, and consistent error handling.
+
+## 23. GITHUB AND DOCUMENTATION
+
+Create:
+- README.md.
+- .gitignore.
+- .env.example.
+- Database schema and migrations.
+- API documentation.
+- Setup instructions.
+- Testing instructions.
+- Deployment instructions.
+- Architecture diagram.
+- Feature roadmap.
+- Screenshots section.
+- Security and privacy notes.
+- Known limitations.
+
+The README should explain the problem, proposed solution, architecture, major features, technologies, setup process, demo mode, and future improvements.
+
+## 24. ACCEPTANCE CRITERIA
+
+The project is complete only when:
+
+1. The frontend and backend run locally.
+2. PostgreSQL stores application data.
+3. Recruiters can sign in securely.
+4. Recruiters can create and manage jobs.
+5. Recruiters can import fictional or authorized candidate data.
+6. Candidates can be filtered and matched against job requirements.
+7. Recruiters can preview and approve campaigns.
+8. Mock email delivery works without sending real messages.
+9. Candidate-response links work securely.
+10. Submitted interest responses appear in the correct dashboard section.
+11. Communication preferences and opt-outs are respected.
+12. Access controls prevent unauthorized candidate-data access.
+13. Essential tests pass.
+14. Documentation explains setup and operation.
+15. No private keys or real candidate information are committed to the repository.
+
+Start by explaining the architecture and creating the project directory structure. Then implement Phase 1 completely, provide the exact commands required to run it, verify the result, and proceed phase by phase.
+
+Do not merely describe code that should be written. Generate the actual files and working implementation in the available environment.
+
+If a required API key or external account is unavailable, implement a working mock service and clearly explain how the real integration can be configured later.

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Icon } from './Icon'
 
 export function Button({ children, variant = 'primary', icon, onClick, type = 'button', className = '', disabled = false }) {
@@ -34,9 +35,53 @@ export function FormField({ label, children, hint }) {
 }
 
 export function Modal({ title, subtitle, onClose, children, wide = false }) {
+  const dialogRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement
+    const dialog = dialogRef.current
+    const focusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    const focusInitial = () => {
+      const autofocus = dialog?.querySelector('[autofocus]')
+      const firstFocusable = dialog?.querySelector(focusableSelector)
+      ;(autofocus || firstFocusable)?.focus()
+    }
+    const frame = requestAnimationFrame(focusInitial)
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !dialog) return
+      const focusable = [...dialog.querySelectorAll(focusableSelector)]
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', handleKeyDown)
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus()
+    }
+  }, [])
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className={`hf-modal ${wide ? 'hf-modal-wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <section ref={dialogRef} className={`hf-modal ${wide ? 'hf-modal-wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabIndex={-1}>
         <div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="Close dialog"><Icon name="close" /></button></div>
         {children}
       </section>

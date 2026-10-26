@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
+import { companyConfig } from '../config'
 import { Icon } from './Icon'
 
 const primaryNav = [
@@ -9,22 +10,28 @@ const primaryNav = [
   { to: '/campaigns', label: 'Campaigns', icon: 'send', countKey: 'campaigns' },
   { to: '/interested', label: 'Interested candidates', icon: 'heart', countKey: 'interested' },
   { to: '/follow-ups', label: 'Follow-ups', icon: 'clock' },
+  { to: '/pricing', label: 'Pricing', icon: 'grid' },
 ]
 
-function Sidebar({ counts, open, onClose }) {
+function getInitials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('') || 'AC'
+}
+
+function Sidebar({ counts, profile, open, onClose }) {
   return (
     <>
       {open && <button className="sidebar-backdrop" onClick={onClose} aria-label="Close navigation" />}
-      <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
-        <div className="brand">
-          <span className="brand-mark"><Icon name="sparkle" size={21} /></span>
-          <span>hireflow<span className="brand-period">.</span></span>
+      <aside id="app-sidebar" className={`sidebar ${open ? 'sidebar-open' : ''}`} aria-label="Workspace navigation">
+        <div className="brand-row">
+          <Link to="/" onClick={onClose} className="brand" aria-label="HireFlow dashboard">
+            <span className="brand-mark"><Icon name="sparkle" size={21} /></span>
+            <span>HireFlow</span>
+          </Link>
           <button className="sidebar-close" onClick={onClose} aria-label="Close navigation"><Icon name="close" /></button>
         </div>
         <div className="workspace-switcher">
-          <span className="workspace-avatar">S</span>
-          <span className="workspace-copy"><strong>Studio North</strong><small>Free workspace</small></span>
-          <Icon name="down" size={15} className="workspace-chevron" />
+          <span className="workspace-avatar">{getInitials(profile.company || companyConfig.workspaceFallback)}</span>
+          <span className="workspace-copy"><strong>{profile.company || companyConfig.workspaceFallback}</strong><small>Workspace</small></span>
         </div>
         <div className="nav-label">WORKSPACE</div>
         <nav className="side-nav" aria-label="Main navigation">
@@ -39,17 +46,16 @@ function Sidebar({ counts, open, onClose }) {
         <div className="sidebar-bottom">
           <div className="upgrade-card">
             <div className="upgrade-icon"><Icon name="sparkle" size={16} /></div>
-            <strong>Make hiring flow</strong>
-            <p>Find your next great hire, all in one place.</p>
-            <NavLink to="/settings" className="upgrade-link">Explore your workspace <Icon name="arrowRight" size={14} /></NavLink>
+            <strong>Plans for every team</strong>
+            <p>Recruitment plans from ₹1,499 per month.</p>
+            <NavLink to="/pricing" className="upgrade-link">Compare plans <Icon name="arrowRight" size={14} /></NavLink>
           </div>
           <NavLink to="/settings" onClick={onClose} className={({ isActive }) => `nav-item settings-link ${isActive ? 'active' : ''}`}>
             <Icon name="settings" size={18} /><span>Settings</span>
           </NavLink>
           <div className="profile-row">
-            <div className="avatar avatar-indigo">AM</div>
-            <div className="profile-copy"><strong>Alex Morgan</strong><small>People & Culture</small></div>
-            <Icon name="dots" size={18} className="profile-more" />
+            <div className="avatar avatar-indigo">{getInitials(profile.name || companyConfig.accountFallback)}</div>
+            <div className="profile-copy"><strong>{profile.name || companyConfig.accountFallback}</strong><small>{profile.role || companyConfig.roleFallback}</small></div>
           </div>
         </div>
       </aside>
@@ -57,7 +63,7 @@ function Sidebar({ counts, open, onClose }) {
   )
 }
 
-export function AppLayout({ title, subtitle, search, onSearch, counts, sidebarOpen, onToggleSidebar, onCloseSidebar, children }) {
+export function AppLayout({ title, subtitle, search, onSearch, counts, profile, persistenceLabel, searchable, sidebarOpen, onToggleSidebar, onCloseSidebar, children }) {
   const searchInput = useRef(null)
   useEffect(() => {
     const focusSearch = (event) => {
@@ -66,34 +72,39 @@ export function AppLayout({ title, subtitle, search, onSearch, counts, sidebarOp
         searchInput.current?.focus()
       }
     }
+    const closeSidebar = (event) => {
+      if (event.key === 'Escape') onCloseSidebar()
+    }
     window.addEventListener('keydown', focusSearch)
-    return () => window.removeEventListener('keydown', focusSearch)
-  }, [])
+    window.addEventListener('keydown', closeSidebar)
+    return () => {
+      window.removeEventListener('keydown', focusSearch)
+      window.removeEventListener('keydown', closeSidebar)
+    }
+  }, [onCloseSidebar])
 
   return (
     <div className="app-shell">
-      <Sidebar counts={counts} open={sidebarOpen} onClose={onCloseSidebar} />
+      <Sidebar counts={counts} profile={profile} open={sidebarOpen} onClose={onCloseSidebar} />
       <div className="main-column">
         <header className="topbar">
-          <button className="mobile-menu icon-button" onClick={onToggleSidebar} aria-label="Open navigation"><Icon name="menu" /></button>
+          <button className="mobile-menu icon-button" onClick={onToggleSidebar} aria-expanded={sidebarOpen} aria-controls="app-sidebar" aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}><Icon name="menu" /></button>
           <div className="breadcrumb">Workspace <Icon name="chevron" size={14} /> <span>{title.split(',')[0]}</span></div>
           <div className="topbar-actions">
-            <label className="global-search">
+            {searchable && <label className="global-search">
               <Icon name="search" size={17} />
               <input ref={searchInput} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search anything..." aria-label="Search current page" />
               <kbd>⌘ K</kbd>
-            </label>
-            <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><span /></button>
-            <div className="avatar avatar-indigo top-avatar">AM</div>
+            </label>}
+            <div className="avatar avatar-indigo top-avatar">{getInitials(profile.name || companyConfig.accountFallback)}</div>
           </div>
         </header>
         <main className="page-content">
           <div className="page-heading">
             <div><h1>{title}</h1><p>{subtitle}</p></div>
-            {title.startsWith('Good morning') && <div className="today-chip"><Icon name="calendar" size={15} /> Saturday, Oct 17</div>}
           </div>
           {children}
-          <footer className="app-footer"><span>HireFlow <span className="footer-dot">·</span> Your hiring, in good flow.</span><span>Demo workspace <span className="demo-dot" /></span></footer>
+          <footer className="app-footer"><span>{companyConfig.name} <span className="footer-dot">·</span> {persistenceLabel}</span><span className="footer-contact"><a href={`mailto:${companyConfig.businessEmail}`}>{companyConfig.businessEmail}</a><a href={`tel:${companyConfig.phoneLink}`}>{companyConfig.phone}</a></span></footer>
         </main>
       </div>
     </div>
