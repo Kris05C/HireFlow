@@ -10,12 +10,17 @@ const envSchema = z.object({
   SESSION_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   DATABASE_SSL: z.enum(['disable', 'require']).default('disable'),
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().email().optional(),
+  EMAIL_FROM: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string().email().optional(),
+  ),
   APP_BASE_URL: z.string().url().default('http://localhost:5173'),
   CANDIDATE_RETENTION_DAYS: z.preprocess(
     (value) => value === '' ? undefined : value,
     z.coerce.number().int().min(1).max(3650).optional(),
   ),
+  CAMPAIGN_QUEUE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(1000),
+  WORKSPACE_QUEUE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).max(1000000).default(10000),
 })
 
 const env = envSchema.parse(process.env)
@@ -33,6 +38,8 @@ export const config = {
   appBaseUrl: env.APP_BASE_URL.replace(/\/$/, ''),
   emailVerificationEnabled: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM),
   candidateRetentionDays: env.CANDIDATE_RETENTION_DAYS,
+  campaignQueueLimitPerHour: env.CAMPAIGN_QUEUE_LIMIT_PER_HOUR,
+  workspaceQueueLimitPerHour: env.WORKSPACE_QUEUE_LIMIT_PER_HOUR,
 }
 
 export function assertServerConfig() {

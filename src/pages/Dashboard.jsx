@@ -31,6 +31,16 @@ function Dashboard({ profile, jobs, followUps, activity, counts }) {
           <Link to="/interested" className="activity-footer-link">View interested candidates <Icon name="arrowRight" size={15} /></Link>
         </section>
       </div>
+      <section className="panel outreach-health-panel">
+        <SectionHeading title="Outreach health" detail="Live recipient states from your workspace." action={<Link to="/campaigns" className="text-link">Review campaigns <Icon name="arrowRight" size={14} /></Link>} />
+        <div className="outreach-health-grid">
+          <div><span className="health-label">Queued</span><strong>{counts.outreach?.queued || 0}</strong><small>Waiting for delivery</small></div>
+          <div><span className="health-label">Sending</span><strong>{counts.outreach?.sending || 0}</strong><small>Claimed by worker</small></div>
+          <div><span className="health-label">Delivered</span><strong>{counts.outreach?.sent || 0}</strong><small>Provider delivery states</small></div>
+          <div><span className="health-label">Suppressed</span><strong>{counts.outreach?.unsubscribed || 0}</strong><small>Unsubscribe protection</small></div>
+        </div>
+        {!counts.outreach?.queued && !counts.outreach?.sending && !counts.outreach?.sent && !counts.outreach?.unsubscribed && <EmptyState icon="send" title="No outreach activity yet" detail="Queueing remains explicit and no email is sent from this dashboard." />}
+      </section>
       <div className="dashboard-bottom">
         <section className="panel open-roles-panel"><SectionHeading title="Open roles" detail="Your team is growing in all the right ways." action={<Link to="/jobs" className="text-link">View all <Icon name="arrowRight" size={14} /></Link>} />
           <div className="open-roles-list">{jobs.filter((job) => job.status === 'Active').slice(0, 4).map((job, index) => <Link to="/jobs" className="open-role-row" key={job.id}><span className={`job-symbol job-symbol-${index % 4}`}><Icon name="briefcase" size={16} /></span><div className="open-role-copy"><strong>{job.title}</strong><span>{job.department} <i>·</i> {job.location}</span></div><span className="role-applicants">{job.applicants}<small> applicants</small></span><StatusBadge status={job.status} /></Link>)}</div>

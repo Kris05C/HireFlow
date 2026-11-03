@@ -21,7 +21,7 @@ function Sidebar({ counts, profile, open, onClose }) {
   return (
     <>
       {open && <button className="sidebar-backdrop" onClick={onClose} aria-label="Close navigation" />}
-      <aside id="app-sidebar" className={`sidebar ${open ? 'sidebar-open' : ''}`} aria-label="Workspace navigation">
+      <aside id="app-sidebar" className={`sidebar ${open ? 'sidebar-open' : ''}`} aria-label="Workspace navigation" aria-hidden={!open}>
         <div className="brand-row">
           <Link to="/" onClick={onClose} className="brand" aria-label="HireFlow dashboard">
             <span className="brand-mark"><Icon name="sparkle" size={21} /></span>
@@ -63,7 +63,7 @@ function Sidebar({ counts, profile, open, onClose }) {
   )
 }
 
-export function AppLayout({ title, subtitle, search, onSearch, counts, profile, persistenceLabel, searchable, sidebarOpen, onToggleSidebar, onCloseSidebar, children }) {
+export function AppLayout({ title, subtitle, search, onSearch, counts, profile, persistenceLabel, searchable, sidebarOpen, onToggleSidebar, onCloseSidebar, theme, onToggleTheme, children }) {
   const searchInput = useRef(null)
   useEffect(() => {
     const focusSearch = (event) => {
@@ -96,6 +96,7 @@ export function AppLayout({ title, subtitle, search, onSearch, counts, profile, 
               <input ref={searchInput} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search anything..." aria-label="Search current page" />
               <kbd>⌘ K</kbd>
             </label>}
+            <button className="icon-button theme-toggle" type="button" onClick={onToggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
             <div className="avatar avatar-indigo top-avatar">{getInitials(profile.name || companyConfig.accountFallback)}</div>
           </div>
         </header>

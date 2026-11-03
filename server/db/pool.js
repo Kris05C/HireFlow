@@ -1,5 +1,6 @@
 import pg from 'pg'
 import { config } from '../config.js'
+import { logger } from '../observability.js'
 
 const { Pool } = pg
 
@@ -12,5 +13,5 @@ export const pool = new Pool({
 })
 
 pool.on('error', () => {
-  console.error('Unexpected PostgreSQL pool error.')
+  logger.error('Unexpected PostgreSQL pool error')
 })

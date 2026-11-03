@@ -23,6 +23,16 @@ export function requireAuth(req, res, next) {
   return next()
 }
 
+export function requireWorkspaceRole(...allowedRoles) {
+  return (req, res, next) => {
+    if (allowedRoles.includes(req.workspaceRole)) return next()
+    return res.status(403).json({
+      error: 'Your workspace role does not allow this action.',
+      code: 'WORKSPACE_PERMISSION_REQUIRED',
+    })
+  }
+}
+
 export function requireWorkspace(databasePool) {
   return async (req, res, next) => {
     try {

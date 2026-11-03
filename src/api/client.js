@@ -1,4 +1,4 @@
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+const apiBaseUrl = (import.meta.env?.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 let csrfToken = ''
 
 async function parseResponse(response) {
@@ -9,6 +9,7 @@ async function parseResponse(response) {
     error.code = payload.code || 'REQUEST_FAILED'
     error.status = response.status
     error.fields = payload.fields || []
+    error.requestId = response.headers?.get?.('X-Request-ID') || ''
     throw error
   }
   return payload
@@ -21,22 +22,31 @@ async function refreshCsrfToken() {
   return csrfToken
 }
 
-export async function apiRequest(path, { method = 'GET', body, headers = {} } = {}) {
+export async function apiRequest(path, options = {}) {
+  const { method = 'GET', body, headers = {} } = options
   const upperMethod = method.toUpperCase()
   if (!['GET', 'HEAD', 'OPTIONS'].includes(upperMethod) && !csrfToken) await refreshCsrfToken()
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    method: upperMethod,
-    credentials: 'include',
-    headers: {
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      ...(!['GET', 'HEAD', 'OPTIONS'].includes(upperMethod) ? { 'X-CSRF-Token': csrfToken } : {}),
-      ...headers,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const payload = await parseResponse(response)
-  if (payload?.csrfToken) csrfToken = payload.csrfToken
-  return payload
+  try {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method: upperMethod,
+      credentials: 'include',
+      headers: {
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(!['GET', 'HEAD', 'OPTIONS'].includes(upperMethod) ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...headers,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    const payload = await parseResponse(response)
+    if (payload?.csrfToken) csrfToken = payload.csrfToken
+    return payload
+  } catch (error) {
+    const csrfFailure = error.code === 'CSRF_TOKEN_REQUIRED' || error.code === 'CSRF_TOKEN_INVALID'
+    if (!csrfFailure || ['GET', 'HEAD', 'OPTIONS'].includes(upperMethod) || options._csrfRetried) throw error
+    csrfToken = ''
+    await refreshCsrfToken()
+    return apiRequest(path, { ...options, _csrfRetried: true })
+  }
 }
 
 export function clearCsrfToken() {

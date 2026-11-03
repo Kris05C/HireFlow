@@ -4,6 +4,7 @@ import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import { config } from '../config.js'
+import { logger } from '../observability.js'
 
 const scrypt = promisify(scryptCallback)
 const registrationSchema = z.object({
@@ -18,8 +19,14 @@ const loginSchema = z.object({
 }).strict()
 const resendSchema = z.object({ email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()) }).strict()
 const verificationSchema = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
+const passwordResetRequestSchema = z.object({ email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()) }).strict()
+const passwordResetSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{64}$/),
+  password: z.string().min(12).max(128),
+}).strict()
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false })
 const resendLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 3, standardHeaders: true, legacyHeaders: false })
+const passwordResetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false })
 
 const hashVerificationToken = (token) => createHash('sha256').update(token).digest('hex')
 
@@ -37,6 +44,25 @@ async function sendVerificationEmail(email, name, token) {
       to: [email],
       subject: 'Verify your HireFlow email address',
       text: `Hello ${name},\n\nVerify your HireFlow email address using this link (valid for 24 hours):\n${verifyUrl}\n\nIf you did not create this account, ignore this message.`,
+    }),
+  })
+  return response.ok
+}
+
+async function sendPasswordResetEmail(email, name, token) {
+  if (!config.emailVerificationEnabled) return false
+  const resetUrl = `${config.appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: config.emailFrom,
+      to: [email],
+      subject: 'Reset your HireFlow password',
+      text: `Hello ${name},\n\nReset your HireFlow password using this link (valid for 1 hour):\n${resetUrl}\n\nIf you did not request this, ignore this message.`,
     }),
   })
   return response.ok
@@ -158,11 +184,66 @@ export function createAuthRouter(databasePool) {
           [result.rows[0].id, hashVerificationToken(token)],
         )
         const delivered = await sendVerificationEmail(parsed.data.email, result.rows[0].full_name, token)
-        if (!delivered) console.error('Verification email delivery was not accepted by the provider.')
+        if (!delivered) logger.error('Verification email delivery was not accepted by the provider.')
       }
       return res.status(202).json({ notice: 'If the account exists and needs verification, delivery will be attempted. Check your email or retry later.' })
     } catch (error) {
       return next(error)
+    }
+  })
+
+  router.post('/password-reset/request', passwordResetLimiter, async (req, res, next) => {
+    const parsed = passwordResetRequestSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+    if (!config.emailVerificationEnabled) return res.status(503).json({ error: 'Password recovery is not configured because email delivery is unavailable.', code: 'EMAIL_NOT_CONFIGURED' })
+    try {
+      const result = await databasePool.query('SELECT id, full_name FROM users WHERE email = $1', [parsed.data.email])
+      if (result.rowCount) {
+        const token = randomBytes(32).toString('hex')
+        await databasePool.query(
+          `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+           VALUES ($1, $2, now() + interval '1 hour')
+           ON CONFLICT (user_id) DO UPDATE
+           SET token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at, consumed_at = NULL, created_at = now()`,
+          [result.rows[0].id, hashVerificationToken(token)],
+        )
+        const delivered = await sendPasswordResetEmail(parsed.data.email, result.rows[0].full_name, token)
+        if (!delivered) logger.error('Password reset email delivery was not accepted by the provider.')
+      }
+      return res.status(202).json({ notice: 'If an account exists for this email, password recovery instructions will be sent.' })
+    } catch (error) {
+      return next(error)
+    }
+  })
+
+  router.post('/password-reset/complete', passwordResetLimiter, async (req, res, next) => {
+    const parsed = passwordResetSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+    let client
+    try {
+      const passwordHash = await hashPassword(parsed.data.password)
+      client = await databasePool.connect()
+      await client.query('BEGIN')
+      const result = await client.query(
+        `UPDATE users u SET password_hash = $1, updated_at = now()
+         FROM password_reset_tokens t
+         WHERE t.user_id = u.id AND t.token_hash = $2 AND t.expires_at > now() AND t.consumed_at IS NULL
+         RETURNING u.id`,
+        [passwordHash, hashVerificationToken(parsed.data.token)],
+      )
+      if (!result.rowCount) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: 'This password reset link is invalid or expired. Request a new one.', code: 'PASSWORD_RESET_INVALID' })
+      }
+      await client.query('UPDATE password_reset_tokens SET consumed_at = now() WHERE user_id = $1', [result.rows[0].id])
+      await client.query(`DELETE FROM user_sessions WHERE sess->>'userId' = $1`, [result.rows[0].id])
+      await client.query('COMMIT')
+      return res.json({ reset: true })
+    } catch (error) {
+      await client?.query('ROLLBACK').catch(() => {})
+      return next(error)
+    } finally {
+      client?.release()
     }
   })
 

@@ -6,7 +6,9 @@ import { Icon } from './components/Icon'
 
 const currentDate = new Date()
 const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
-const includesQuery = (value, query) => value.toLowerCase().includes(query.trim().toLowerCase())
+const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, ' ')
+const locationKey = (value) => normalizeText(value).toLocaleLowerCase()
+const includesQuery = (value, query) => normalizeText(value).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
 
 export function JobsPage({ jobs, setJobs, createJob, updateJob, updateJobStatus, persistenceLabel, search }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -153,7 +155,7 @@ function calculateMatch(candidate, job) {
   return { score: Math.min(100, Math.round(skillPoints + rolePoints + locationPoints)), matchedSkills }
 }
 
-export function CandidatesPage({ candidates, setCandidates, createCandidate, persistenceLabel, jobs, search }) {
+export function CandidatesPage({ candidates, setCandidates, createCandidate, updateCandidateStatus, getCandidateNotes, addCandidateNote, getCandidateFolders, createCandidateFolder, addCandidateToFolder, persistenceLabel, jobs, search }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -161,14 +163,35 @@ export function CandidatesPage({ candidates, setCandidates, createCandidate, per
   const activeJobs = jobs.filter((job) => job.status === 'Active')
   const [jobId, setJobId] = useState(activeJobs[0]?.id || '')
   const [location, setLocation] = useState('All locations')
+  const [statusFilter, setStatusFilter] = useState('All statuses')
+  const [sortOrder, setSortOrder] = useState('match')
   const [selectedCandidate, setSelectedCandidate] = useState(null)
+  const [candidateNotes, setCandidateNotes] = useState([])
+  const [noteDraft, setNoteDraft] = useState('')
+  const [profileError, setProfileError] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [folders, setFolders] = useState([])
+  const [folderName, setFolderName] = useState('')
+  const [selectedFolder, setSelectedFolder] = useState('')
+  const [savingFolder, setSavingFolder] = useState(false)
   const currentJob = activeJobs.find((job) => job.id === jobId) || activeJobs[0]
-  const locations = [...new Set(candidates.map((candidate) => candidate.location))]
+  const locations = [...new Map(
+    candidates
+      .flatMap((candidate) => normalizeText(candidate.location).split(/\s*(?:,|\||\/)\s*/))
+      .filter(Boolean)
+      .map((item) => [locationKey(item), item]),
+  ).values()].sort((first, second) => first.localeCompare(second))
   const results = candidates.map((candidate) => ({ candidate, match: currentJob ? calculateMatch(candidate, currentJob) : { score: 0, matchedSkills: [] } }))
     .filter(({ candidate }) => {
       const queryMatch = !search || [candidate.name, candidate.role, candidate.location, ...candidate.skills].some((value) => includesQuery(value, search))
-      return queryMatch && (location === 'All locations' || candidate.location === location)
-    }).sort((a, b) => b.match.score - a.match.score)
+      return queryMatch
+        && (location === 'All locations' || normalizeText(candidate.location).split(/\s*(?:,|\||\/)\s*/).some((item) => locationKey(item) === locationKey(location)))
+        && (statusFilter === 'All statuses' || (candidate.pipelineStatus || 'New') === statusFilter)
+    }).sort((a, b) => sortOrder === 'name'
+      ? a.candidate.name.localeCompare(b.candidate.name)
+      : sortOrder === 'experience'
+        ? Number(b.candidate.experienceYears || 0) - Number(a.candidate.experienceYears || 0)
+        : b.match.score - a.match.score)
   const updateCandidateForm = (key, value) => {
     setCandidateForm((current) => ({ ...current, [key]: value }))
     setError('')
@@ -203,12 +226,79 @@ export function CandidatesPage({ candidates, setCandidates, createCandidate, per
       setSaving(false)
     }
   }
+  const openCandidateProfile = async (candidate) => {
+    setSelectedCandidate(candidate)
+    setNoteDraft('')
+    setSelectedFolder('')
+    setProfileError('')
+    try {
+      const [notes, loadedFolders] = await Promise.all([getCandidateNotes(candidate.id), getCandidateFolders()])
+      setCandidateNotes(notes)
+      setFolders(loadedFolders)
+    } catch (loadError) {
+      setProfileError(loadError.message || 'Candidate notes could not be loaded.')
+    }
+  }
+  const changePipelineStatus = async (status) => {
+    try {
+      const updated = await updateCandidateStatus(selectedCandidate.id, status)
+      setSelectedCandidate((current) => ({ ...current, ...updated, pipelineStatus: updated.pipelineStatus || status }))
+      setCandidates((current) => current.map((item) => item.id === selectedCandidate.id ? { ...item, ...updated, pipelineStatus: updated.pipelineStatus || status } : item))
+      setProfileError('')
+    } catch (statusError) {
+      setProfileError(statusError.message || 'Candidate status could not be updated.')
+    }
+  }
+  const saveNote = async (event) => {
+    event.preventDefault()
+    if (!noteDraft.trim()) return
+    setSavingNote(true)
+    try {
+      const note = await addCandidateNote(selectedCandidate.id, noteDraft.trim())
+      setCandidateNotes((current) => [note, ...current])
+      setNoteDraft('')
+      setProfileError('')
+    } catch (noteError) {
+      setProfileError(noteError.message || 'Candidate note could not be saved.')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+  const createFolder = async (event) => {
+    event.preventDefault()
+    if (!folderName.trim()) return
+    setSavingFolder(true)
+    try {
+      const folder = await createCandidateFolder(folderName.trim())
+      setFolders((current) => [folder, ...current])
+      setFolderName('')
+      setProfileError('')
+    } catch (folderError) {
+      setProfileError(folderError.message || 'Candidate folder could not be created.')
+    } finally {
+      setSavingFolder(false)
+    }
+  }
+  const assignToFolder = async () => {
+    if (!selectedFolder || !selectedCandidate) return
+    try {
+      await addCandidateToFolder(selectedFolder, selectedCandidate.id)
+      setFolders((current) => current.map((folder) => folder.id === selectedFolder
+        ? { ...folder, candidate_count: Number(folder.candidate_count || 0) + 1 }
+        : folder))
+      setProfileError('')
+    } catch (folderError) {
+      setProfileError(folderError.message || 'Candidate could not be added to the folder.')
+    }
+  }
   return (
     <>
       <div className="discovery-banner"><div className="discovery-banner-icon"><Icon name="sparkle" size={22} /></div><div><strong>Explainable candidate matching</strong><p>When authorized candidate records are connected, matches are based on listed skills, role keywords, and location fit.</p></div></div>
       <div className="page-toolbar">
         <div className="toolbar-filters"><label className="select-filter"><span className="filter-prefix">For</span><select value={currentJob?.id || ''} onChange={(event) => setJobId(event.target.value)} aria-label="Select job">{activeJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}</select><Icon name="down" size={14} /></label>
-          <label className="select-filter"><Icon name="location" size={16} /><select value={location} onChange={(event) => setLocation(event.target.value)} aria-label="Filter by candidate location"><option>All locations</option>{locations.map((item) => <option key={item}>{item}</option>)}</select><Icon name="down" size={14} /></label></div>
+          <label className="select-filter"><Icon name="location" size={16} /><select value={location} onChange={(event) => setLocation(event.target.value)} aria-label="Filter by candidate location"><option>All locations</option>{locations.map((item) => <option key={locationKey(item)} value={item}>{item}</option>)}</select><Icon name="down" size={14} /></label></div>
+          <label className="select-filter"><span className="filter-prefix">Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by candidate status"><option>All statuses</option><option>New</option><option>Screening</option><option>Interview</option><option>Offer</option><option>Hired</option><option>Rejected</option></select><Icon name="down" size={14} /></label>
+          <label className="select-filter"><span className="filter-prefix">Sort</span><select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} aria-label="Sort candidates"><option value="match">Best match</option><option value="name">Name</option><option value="experience">Experience</option></select><Icon name="down" size={14} /></label>
         <span className="results-count">{results.length} profiles · {persistenceLabel}</span>
         <Button icon="plus" onClick={() => setShowAddModal(true)}>Add consented profile</Button>
       </div>
@@ -222,12 +312,12 @@ export function CandidatesPage({ candidates, setCandidates, createCandidate, per
           <div className="candidate-source">{candidate.outreachConsent ? 'Outreach consent recorded' : 'Discovery consent recorded'}</div>
           <div className="match-row"><div><span className="match-score">{match.score}%</span><span className="match-caption"> match</span></div><div className="match-meter"><span style={{ width: `${match.score}%` }} /></div></div>
           <div className="match-explainer">{match.matchedSkills.length} of {currentJob?.skills.length || 0} listed skills match</div>
-          <button className="candidate-action" onClick={() => setSelectedCandidate(candidate)}>View profile <Icon name="arrowRight" size={15} /></button>
+          <button className="candidate-action" onClick={() => openCandidateProfile(candidate)}>View profile <Icon name="arrowRight" size={15} /></button>
         </article>)}
       </div>
       {!results.length && <div className="panel"><EmptyState icon="search" title="No candidate records available" detail="Add a candidate who has consented to recruitment matching, or connect an authorized candidate source." /></div>}
       {selectedCandidate && <Modal title={selectedCandidate.name} subtitle={`${selectedCandidate.role} · ${selectedCandidate.location}`} onClose={() => setSelectedCandidate(null)}>
-        <div className="candidate-profile-preview"><div className="candidate-profile-heading"><Avatar candidate={selectedCandidate} /><div><strong>{selectedCandidate.experience} experience</strong><span>Source: {selectedCandidate.source || 'Authorized workspace entry'}</span></div></div>{selectedCandidate.outreachConsent && selectedCandidate.email && <p className="candidate-consent-detail">Email contact consent recorded for {selectedCandidate.email}.</p>}<h3>Skills</h3><div className="skill-tags">{selectedCandidate.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><div className="modal-actions"><Button onClick={() => setSelectedCandidate(null)}>Done</Button></div></div>
+        <div className="candidate-profile-preview"><div className="candidate-profile-heading"><Avatar candidate={selectedCandidate} /><div><strong>{selectedCandidate.experience} experience</strong><span>Source: {selectedCandidate.source || 'Authorized workspace entry'}</span></div></div>{selectedCandidate.outreachConsent && selectedCandidate.email && <p className="candidate-consent-detail">Email contact consent recorded for {selectedCandidate.email}.</p>}<h3>Pipeline status</h3><select value={selectedCandidate.pipelineStatus || 'New'} onChange={(event) => changePipelineStatus(event.target.value)} aria-label="Candidate pipeline status"><option>New</option><option>Screening</option><option>Interview</option><option>Offer</option><option>Hired</option><option>Rejected</option></select><h3>Folder</h3><form className="inline-form" onSubmit={createFolder}><input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="New folder name" maxLength={120} aria-label="New candidate folder name" /><Button type="submit" disabled={savingFolder || !folderName.trim()}>{savingFolder ? 'Creating…' : 'Create'}</Button></form><div className="inline-form"><select value={selectedFolder} onChange={(event) => setSelectedFolder(event.target.value)} aria-label="Select candidate folder"><option value="">Select a folder</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name} · {folder.candidate_count || 0}</option>)}</select><Button type="button" onClick={assignToFolder} disabled={!selectedFolder}>Add</Button></div><h3>Skills</h3><div className="skill-tags">{selectedCandidate.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><h3>Internal notes</h3>{candidateNotes.length ? candidateNotes.map((note) => <p key={note.id} className="candidate-note"><strong>{note.author_name || 'Team member'}</strong><br />{note.body}</p>) : <p className="muted-cell">No internal notes yet.</p>}<form onSubmit={saveNote}><textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Add an internal recruiter note" maxLength={5000} rows={3} /><Button type="submit" disabled={savingNote || !noteDraft.trim()}>{savingNote ? 'Saving…' : 'Add note'}</Button></form>{profileError && <p className="form-error" role="alert">{profileError}</p>}<div className="modal-actions"><Button onClick={() => setSelectedCandidate(null)}>Done</Button></div></div>
       </Modal>}
       {showAddModal && <Modal title="Add a consented candidate" subtitle="Only add candidate information you are authorized to use." onClose={closeCandidateForm}>
         <form className="modal-form" onSubmit={submitCandidate}>
@@ -247,7 +337,7 @@ export function CandidatesPage({ candidates, setCandidates, createCandidate, per
   )
 }
 
-export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateCampaign, persistenceLabel, jobs, search }) {
+export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateCampaign, queueCampaign, getCampaignRecipients, getOutreachTemplates, createOutreachTemplate, persistenceLabel, jobs, search }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const showModal = searchParams.get('new') === '1'
   const setShowModal = (open) => {
@@ -256,35 +346,83 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
     else nextParams.delete('new')
     setSearchParams(nextParams, { replace: !open })
   }
-  const [form, setForm] = useState({ name: '', jobId: jobs.find((job) => job.status === 'Active')?.id || '', subject: '' })
+  const [form, setForm] = useState({ name: '', jobId: jobs.find((job) => job.status === 'Active')?.id || '', subject: '', body: '' })
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [templates, setTemplates] = useState([])
+  const [templateName, setTemplateName] = useState('')
+  const [templateSaving, setTemplateSaving] = useState(false)
+  const [queueing, setQueueing] = useState('')
+  const [recipients, setRecipients] = useState([])
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState([])
+  const [loadingRecipients, setLoadingRecipients] = useState(false)
+  useEffect(() => {
+    let active = true
+    getOutreachTemplates().then((loadedTemplates) => {
+      if (active) setTemplates(loadedTemplates)
+    }).catch((loadError) => {
+      if (active) setError(loadError.message || 'Outreach templates could not be loaded.')
+    })
+    return () => { active = false }
+  }, [getOutreachTemplates])
   const activeJobs = jobs.filter((job) => job.status === 'Active')
   const filtered = campaigns.filter((campaign) => !search || [campaign.name, campaign.subject, campaign.status].some((value) => includesQuery(value, search)))
+  const campaignSummary = ['Draft', 'Queued', 'Sending', 'Sent', 'Cancelled'].map((status) => ({ status, count: campaigns.filter((campaign) => campaign.status === status).length }))
   const selectedJob = jobs.find((job) => job.id === form.jobId)
   const canEditPreview = !preview || preview.status === 'Draft'
   const audience = 0
   const closeModal = () => { setShowModal(false); setPreview(null); setError('') }
+  const loadRecipients = async (campaign) => {
+    if (!campaign?.id || campaign.status !== 'Draft') return
+    setLoadingRecipients(true)
+    try {
+      const loaded = await getCampaignRecipients(campaign.id)
+      setRecipients(loaded)
+      setSelectedRecipientIds(loaded.map((recipient) => recipient.id))
+    } catch (recipientError) {
+      setError(recipientError.message || 'Eligible recipients could not be loaded.')
+    } finally {
+      setLoadingRecipients(false)
+    }
+  }
   const openModal = () => {
-    setForm({ name: '', jobId: activeJobs[0]?.id || '', subject: '' })
+    setForm({ name: '', jobId: activeJobs[0]?.id || '', subject: '', body: '' })
     setError('')
     setShowModal(true)
   }
+  const saveTemplate = async (event) => {
+    event.preventDefault()
+    if (!templateName.trim() || !form.subject.trim() || !form.body.trim()) {
+      setError('Add a template name, subject, and message before saving the template.')
+      return
+    }
+    setTemplateSaving(true)
+    try {
+      const template = await createOutreachTemplate({ name: templateName.trim(), subject: form.subject.trim(), body: form.body.trim() })
+      setTemplates((current) => [template, ...current])
+      setTemplateName('')
+      setError('')
+    } catch (templateError) {
+      setError(templateError.message || 'The outreach template could not be saved.')
+    } finally {
+      setTemplateSaving(false)
+    }
+  }
   const submitCampaign = async (event) => {
     event.preventDefault()
-    if (!form.name.trim() || !form.jobId || !form.subject.trim()) {
-      setError('Add a campaign name, related active job, and email subject.')
+    if (!form.name.trim() || !form.jobId || !form.subject.trim() || !form.body.trim()) {
+      setError('Add a campaign name, related active job, email subject, and message.')
       return
     }
     setSaving(true)
     try {
       if (preview) {
-        const updated = await updateCampaign(preview.id, { name: form.name.trim(), jobId: form.jobId, subject: form.subject.trim() })
+        const updated = await updateCampaign(preview.id, { name: form.name.trim(), jobId: form.jobId, subject: form.subject.trim(), body: form.body.trim() })
         setCampaigns((current) => current.map((item) => item.id === preview.id ? { ...item, ...updated, name: form.name.trim(), jobId: form.jobId, subject: form.subject.trim() } : item))
       } else {
-        const draft = { id: `campaign-${Date.now()}`, name: form.name.trim(), jobId: form.jobId, subject: form.subject.trim(), audience: 0, status: 'Draft', date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) }
-        const savedCampaign = await createCampaign({ name: draft.name, jobId: draft.jobId, subject: draft.subject })
+        const draft = { id: `campaign-${Date.now()}`, name: form.name.trim(), jobId: form.jobId, subject: form.subject.trim(), body: form.body.trim(), audience: 0, status: 'Draft', date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) }
+        const savedCampaign = await createCampaign({ name: draft.name, jobId: draft.jobId, subject: draft.subject, body: form.body.trim() })
         setCampaigns((current) => [{ ...draft, ...savedCampaign }, ...current])
       }
       closeModal()
@@ -295,10 +433,23 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
       setSaving(false)
     }
   }
+  const handleQueue = async (campaign, recipientIds = null) => {
+    setQueueing(campaign.id)
+    setError('')
+    try {
+      const queued = await queueCampaign(campaign.id, recipientIds)
+      setCampaigns((current) => current.map((item) => item.id === campaign.id ? { ...item, ...queued, status: 'Queued', audience: queued.recipient_count || item.audience } : item))
+    } catch (queueError) {
+      setError(queueError.message || 'The campaign could not be queued.')
+    } finally {
+      setQueueing('')
+    }
+  }
   return (
     <>
       <div className="campaign-callout"><div className="callout-icon"><Icon name="mail" size={19} /></div><div><strong>Review every message before outreach</strong><p>Drafts are saved: {persistenceLabel}. Sending requires a configured server-side email provider and explicit recipient eligibility.</p></div></div>
       <div className="page-toolbar"><div className="toolbar-filters"><span className="results-count">{filtered.length} campaigns</span></div><Button icon="plus" onClick={openModal} disabled={!activeJobs.length}>Create campaign</Button></div>
+      <div className="campaign-summary-strip" aria-label="Campaign status summary">{campaignSummary.map((item) => <div key={item.status}><StatusBadge status={item.status} /><strong>{item.count}</strong></div>)}</div>
       {!activeJobs.length && <p className="empty-hint" role="status">Create an active job before starting a campaign.</p>}
       <div className="campaign-grid">
         {filtered.map((campaign, index) => {
@@ -306,7 +457,8 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
           return <article className="campaign-card" key={campaign.id}>
             <div className={`campaign-card-art art-${index % 3}`}><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="art-center"><Icon name={index % 2 ? 'sparkle' : 'send'} size={23} /></div><span className="art-count"><Icon name="users" size={14} />{campaign.audience} people</span></div>
             <div className="campaign-card-content"><div className="campaign-card-status"><StatusBadge status={campaign.status} /><span>{campaign.date}</span></div><h3>{campaign.name}</h3><p>{job?.title || 'Role unavailable'}</p><div className="campaign-subject"><Icon name="mail" size={15} /><span>{campaign.subject}</span></div>
-              <button className="campaign-preview-button" onClick={() => { setForm({ name: campaign.name, jobId: campaign.jobId, subject: campaign.subject }); setError(''); setShowModal(true); setPreview(campaign) }}>{campaign.status === 'Draft' ? 'Edit draft' : 'View campaign'} <Icon name="arrowRight" size={15} /></button>
+              <button className="campaign-preview-button" onClick={() => { setForm({ name: campaign.name, jobId: campaign.jobId, subject: campaign.subject, body: campaign.body || '' }); setError(''); setShowModal(true); setPreview(campaign); loadRecipients(campaign) }}>{campaign.status === 'Draft' ? 'Edit draft' : 'View campaign'} <Icon name="arrowRight" size={15} /></button>
+              {campaign.status === 'Draft' && <Button variant="secondary" onClick={() => handleQueue(campaign)} disabled={queueing === campaign.id}>{queueing === campaign.id ? 'Queueing…' : 'Queue safely'}</Button>}
             </div>
           </article>
         })}
@@ -316,11 +468,15 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
         <form className="modal-form campaign-form" onSubmit={submitCampaign}>
           <div className="form-grid"><FormField label="Campaign name"><input autoFocus={!preview} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Design talent — November" required readOnly={!canEditPreview} /></FormField>
             <FormField label="Related job"><select value={form.jobId} onChange={(event) => setForm((current) => ({ ...current, jobId: event.target.value }))} required disabled={!canEditPreview}>{activeJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}</select></FormField></div>
+          <FormField label="Saved template"><select value="" onChange={(event) => { const template = templates.find((item) => item.id === event.target.value); if (template) setForm((current) => ({ ...current, subject: template.subject, body: template.body })) }} disabled={!canEditPreview}><option value="">Select a template</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></FormField>
           <FormField label="Email subject"><input value={form.subject} onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))} placeholder="A role we thought you'd love" required readOnly={!canEditPreview} /></FormField>
-          <div className="email-preview"><div className="email-preview-top"><span><Icon name="mail" size={15} /> EMAIL PREVIEW</span><span className="preview-safe"><span /> DRAFT</span></div><div className="email-preview-body"><p>To: <strong>{audience} eligible candidate profiles</strong></p><p>Subject: <strong>{form.subject || 'Your subject line will appear here'}</strong></p><div className="email-divider" /><p>Hi there,</p><p>We thought you might be interested in the <strong>{selectedJob?.title || 'open role'}</strong> position at HireFlow.</p><p>If you’d like to learn more, we’d be glad to hear from you.</p><p>Regards,<br />HireFlow</p></div></div>
+          <FormField label="Message"><textarea value={form.body} onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} placeholder="Write a respectful, consent-based message." rows={5} maxLength={10000} readOnly={!canEditPreview} /></FormField>
+          {preview && canEditPreview && <section className="recipient-picker" aria-labelledby="recipient-picker-title"><div className="recipient-picker-heading"><div><h3 id="recipient-picker-title">Eligible recipients</h3><p>Only candidates with current consent, valid retention, and no unsubscribe suppression appear.</p></div><span>{loadingRecipients ? 'Loading…' : `${selectedRecipientIds.length} selected`}</span></div>{!loadingRecipients && recipients.length > 0 && <div className="recipient-picker-list">{recipients.map((recipient) => <label key={recipient.id}><input type="checkbox" checked={selectedRecipientIds.includes(recipient.id)} onChange={(event) => setSelectedRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span><strong>{recipient.full_name}</strong><small>{recipient.role_title} · {recipient.location}</small></span></label>)}</div>}{!loadingRecipients && !recipients.length && <p className="muted-cell">No eligible recipients are currently available.</p>}</section>}
+          {canEditPreview && <div className="inline-form"><input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="New template name" maxLength={120} aria-label="New outreach template name" /><Button type="button" onClick={saveTemplate} disabled={templateSaving || !templateName.trim()}>{templateSaving ? 'Saving…' : 'Save template'}</Button></div>}
+          <div className="email-preview"><div className="email-preview-top"><span><Icon name="mail" size={15} /> EMAIL PREVIEW</span><span className="preview-safe"><span /> DRAFT</span></div><div className="email-preview-body"><p>To: <strong>{audience} eligible candidate profiles</strong></p><p>Subject: <strong>{form.subject || 'Your subject line will appear here'}</strong></p><div className="email-divider" /><p>{form.body || `We thought you might be interested in the ${selectedJob?.title || 'open role'} position at HireFlow.`}</p></div></div>
           <div className="no-send-note"><Icon name="check" size={15} /> {canEditPreview ? `This is a saved draft (${persistenceLabel}).` : 'This campaign is read-only here.'} No email was sent by this interface.</div>
           {error && <p className="form-error" role="alert">{error}</p>}
-          <div className="modal-actions"><Button variant="secondary" onClick={closeModal} disabled={saving}>{canEditPreview ? 'Cancel' : 'Close'}</Button>{canEditPreview && <Button type="submit" disabled={saving}>{saving ? 'Saving…' : preview ? 'Save changes' : 'Save as draft'}</Button>}</div>
+          <div className="modal-actions"><Button variant="secondary" onClick={closeModal} disabled={saving || Boolean(queueing)}>{canEditPreview ? 'Cancel' : 'Close'}</Button>{canEditPreview && <>{preview && <Button type="button" variant="secondary" onClick={() => handleQueue(preview, selectedRecipientIds)} disabled={saving || Boolean(queueing) || loadingRecipients || !selectedRecipientIds.length}>{queueing === preview.id ? 'Queueing…' : 'Queue selected'}</Button>}<Button type="submit" disabled={saving || Boolean(queueing)}>{saving ? 'Saving…' : preview ? 'Save changes' : 'Save as draft'}</Button></>}</div>
         </form>
       </Modal>}
     </>
@@ -436,10 +592,11 @@ const settingsNav = [
   { id: 'profile', label: 'My profile', icon: 'users' },
   { id: 'workspace', label: 'Workspace', icon: 'briefcase' },
   { id: 'contact', label: 'Contact', icon: 'mail' },
+  { id: 'appearance', label: 'Appearance', icon: 'sparkle' },
   { id: 'privacy', label: 'Data & services', icon: 'heart' },
 ]
 
-export function SettingsPage({ profile, saveProfile, persistenceMode = 'browser', signOut }) {
+export function SettingsPage({ profile, saveProfile, persistenceMode = 'browser', signOut, theme = 'light', onToggleTheme }) {
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || 'profile')
   const [draft, setDraft] = useState(profile || initialProfile)
@@ -496,6 +653,7 @@ export function SettingsPage({ profile, saveProfile, persistenceMode = 'browser'
         </form>
         <section className="panel settings-card settings-workspace" id="workspace"><SectionHeading title="Workspace" detail="Workspace information." /><div className="workspace-setting-row"><span className="workspace-avatar settings-workspace-avatar">{(profile.company || companyConfig.workspaceFallback).slice(0, 1).toUpperCase()}</span><div><strong>{profile.company || companyConfig.workspaceFallback}</strong><p>{profile.name ? `Managed by ${profile.name}` : 'Workspace profile not set'}</p></div><Button variant="secondary" onClick={() => document.getElementById('profile')?.scrollIntoView({ behavior: 'smooth' })}>Edit details</Button></div></section>
         <section className="panel settings-card" id="contact"><SectionHeading title="Founder & contact" detail={`Reach ${companyConfig.name}.`} /><div className="contact-details"><p><strong>Founder</strong><span>{companyConfig.founder}</span></p><p><strong>Business</strong><a href={`mailto:${companyConfig.businessEmail}`}>{companyConfig.businessEmail}</a></p><p><strong>Phone</strong><a href={`tel:${companyConfig.phoneLink}`}>{companyConfig.phone}</a></p><p><strong>Personal</strong><a href={`mailto:${companyConfig.personalEmail}`}>{companyConfig.personalEmail}</a></p></div></section>
+        <section className="panel settings-card appearance-card" id="appearance"><SectionHeading title="Appearance" detail="Choose the workspace look that feels right for you." /><div className="theme-choice"><div><strong>{theme === 'dark' ? 'Dark mode' : 'Light mode'}</strong><p>Your preference is saved on this device.</p></div><button type="button" className="theme-switch" onClick={onToggleTheme} aria-pressed={theme === 'dark'}><span>{theme === 'dark' ? 'Use light' : 'Use dark'}</span><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} /></button></div></section>
         <section className="panel privacy-card" id="privacy"><div className="privacy-card-icon"><Icon name="heart" size={18} /></div><div><strong>Services, data & payments</strong><p>{persistenceMode === 'browser' ? 'Jobs, campaign drafts, reminders, profile settings, and pricing selections are stored in this browser only.' : 'Workspace profiles and recruitment records are stored by the configured server. Candidate data, subscriptions, and payments remain subject to server configuration and verified integrations.'} Candidate accounts, production consent workflows, email delivery, subscription entitlements, and payment processing require additional configured services.</p><p><a href={`mailto:${companyConfig.businessEmail}?subject=HireFlow%20services%20and%20pricing`}>Contact us about services and pricing</a></p></div></section>
       </div>
     </div>

@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap');
-
 :root {
   font-family: 'DM Sans', 'Segoe UI', sans-serif;
   color: #18223b;
@@ -16,17 +14,89 @@
   --blue: #4f6df5;
   --blue-dark: #3e5be1;
   --page: #f8f9fc;
+  --surface: #ffffff;
+  --surface-soft: #fafbfe;
+  --text: #18223b;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --navy: #edf2ff;
+  --muted: #aab5cd;
+  --border: #2b3854;
+  --blue: #8da3ff;
+  --blue-dark: #a8b8ff;
+  --page: #101725;
+  --surface: #172238;
+  --surface-soft: #1d2a42;
+  --text: #edf2ff;
 }
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; font-size: 14px; background: var(--page); }
 body, button, input, select, textarea { font-family: 'DM Sans', 'Segoe UI', sans-serif; }
+h1, h2, h3, h4, .brand, .nav-item, .page-heading, .section-heading { font-family: 'Manrope', 'DM Sans', 'Segoe UI', sans-serif; }
 button, input, select, textarea { font-size: inherit; }
 button { color: inherit; }
 a { color: inherit; text-decoration: none; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #9aaafd; outline-offset: 2px; }
 #root { min-height: 100vh; }
 ::selection { background: #e4e9ff; color: #263b9d; }
+
+.app-shell { position: relative; isolation: isolate; overflow: hidden; background: var(--page); }
+.app-shell::before, .app-shell::after { position: fixed; z-index: -1; width: 34vw; height: 34vw; border-radius: 50%; content: ''; filter: blur(2px); opacity: .24; pointer-events: none; }
+.app-shell::before { top: -12vw; right: 8vw; background: radial-gradient(circle, #899cff 0, #b9c3ff 34%, transparent 70%); animation: float-orb 18s ease-in-out infinite alternate; }
+.app-shell::after { bottom: -16vw; left: 18vw; background: radial-gradient(circle, #8bdcc8 0, #a9e9dc 30%, transparent 72%); animation: float-orb 22s ease-in-out infinite alternate-reverse; }
+@keyframes float-orb { from { transform: translate3d(-3%, -2%, 0) scale(.94); } to { transform: translate3d(5%, 4%, 0) scale(1.08); } }
+
+:root[data-theme='dark'] body { background: var(--page); }
+:root[data-theme='dark'] .sidebar,
+:root[data-theme='dark'] .topbar,
+:root[data-theme='dark'] .panel,
+:root[data-theme='dark'] .auth-panel,
+:root[data-theme='dark'] .settings-nav,
+:root[data-theme='dark'] .select-filter,
+:root[data-theme='dark'] .global-search,
+:root[data-theme='dark'] .workspace-switcher,
+:root[data-theme='dark'] .upgrade-card,
+:root[data-theme='dark'] .plan-card,
+:root[data-theme='dark'] .campaign-summary-strip > div,
+:root[data-theme='dark'] .outreach-health-grid > div,
+:root[data-theme='dark'] .recipient-picker-list label { background: var(--surface); border-color: var(--border); }
+:root[data-theme='dark'] .page-content,
+:root[data-theme='dark'] .main-column,
+:root[data-theme='dark'] .page-heading h1,
+:root[data-theme='dark'] .section-heading h2,
+:root[data-theme='dark'] .data-table,
+:root[data-theme='dark'] .settings-card strong,
+:root[data-theme='dark'] .contact-details span,
+:root[data-theme='dark'] .contact-details a { color: var(--text); }
+:root[data-theme='dark'] .data-table th,
+:root[data-theme='dark'] .data-table td,
+:root[data-theme='dark'] .profile-row,
+:root[data-theme='dark'] .settings-nav-item,
+:root[data-theme='dark'] .form-field input,
+:root[data-theme='dark'] .form-field select,
+:root[data-theme='dark'] .form-field textarea { border-color: var(--border); }
+:root[data-theme='dark'] .form-field input,
+:root[data-theme='dark'] .form-field select,
+:root[data-theme='dark'] .form-field textarea,
+:root[data-theme='dark'] .global-search input { background: var(--surface-soft); color: var(--text); }
+:root[data-theme='dark'] .nav-item { color: #aab5cd; }
+:root[data-theme='dark'] .nav-item:hover { background: var(--surface-soft); color: var(--text); }
+:root[data-theme='dark'] .nav-item.active { background: #2a3861; color: #c5d0ff; }
+:root[data-theme='dark'] .topbar { box-shadow: 0 1px 0 #ffffff0a; }
+:root[data-theme='dark'] .welcome-banner { background: linear-gradient(120deg, #293866, #35447d 60%, #293b65); }
+:root[data-theme='dark'] .discovery-banner,
+:root[data-theme='dark'] .campaign-callout,
+:root[data-theme='dark'] .interested-banner,
+:root[data-theme='dark'] .followup-banner { background: linear-gradient(120deg, #1d2e4a, #27365a); border-color: #3a4b70; }
+
+.theme-toggle { color: var(--muted); }
+.theme-toggle:hover { color: var(--blue-dark); background: var(--surface-soft); }
+.theme-switch { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 7px; padding: 8px 11px; background: var(--surface-soft); color: var(--blue-dark); font-weight: 700; cursor: pointer; }
+.theme-choice { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.theme-choice p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 
 .pipeline-summary {
   display: grid;
@@ -39,6 +109,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .pipeline-summary div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .pipeline-summary strong { color: var(--navy); font-size: 22px; }
 .pipeline-summary span { color: var(--muted); font-size: 11px; }
+.outreach-health-panel { margin-top: 19px; }
+.outreach-health-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--border); }
+.outreach-health-grid > div { display: flex; min-height: 106px; flex-direction: column; gap: 5px; padding: 16px; background: #fff; }
+.health-label { color: var(--muted); font-size: 11px; font-weight: 600; }
+.outreach-health-grid strong { color: var(--navy); font: 750 25px/1 Manrope, sans-serif; letter-spacing: -.5px; }
+.outreach-health-grid small { color: #a0a8b7; font-size: 10px; }
+.campaign-summary-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin: -5px 0 19px; }
+.campaign-summary-strip > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.campaign-summary-strip strong { color: var(--navy); font: 700 18px/1 Manrope, sans-serif; }
+.recipient-picker { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: #fafbfe; }
+.recipient-picker-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.recipient-picker-heading h3 { margin: 0 0 4px; color: var(--navy); font-size: 13px; }
+.recipient-picker-heading p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.recipient-picker-heading > span { flex-shrink: 0; color: var(--blue-dark); font-size: 10px; font-weight: 700; }
+.recipient-picker-list { display: grid; max-height: 190px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 12px; overflow-y: auto; }
+.recipient-picker-list label { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid #edf0f5; border-radius: 6px; background: #fff; cursor: pointer; }
+.recipient-picker-list input { margin-top: 2px; accent-color: var(--blue); }
+.recipient-picker-list span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.recipient-picker-list strong { overflow: hidden; color: var(--navy); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.recipient-picker-list small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .contact-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
 .contact-details p { display: flex; flex-direction: column; gap: 4px; margin: 0; overflow-wrap: anywhere; }
 .contact-details strong { color: var(--muted); font-size: 11px; font-weight: 500; }

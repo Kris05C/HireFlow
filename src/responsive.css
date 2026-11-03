@@ -33,7 +33,12 @@
 
 @media (min-width: 781px) {
   .app-shell { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
-  .sidebar { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+  .sidebar { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; transform: translateX(-100%); transition: transform .2s ease; }
+  .sidebar.sidebar-open { transform: translateX(0); }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 20; border: 0; background: #18223b26; }
+  .main-column { margin-left: 0; transition: margin-left .2s ease; }
+  .sidebar.sidebar-open + .main-column { margin-left: 252px; }
+  .mobile-menu { display: grid; }
   .brand-row { display: flex; align-items: center; flex: 0 0 auto; }
   .brand { flex: 1 1 auto; min-width: 0; }
   .side-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -48,7 +53,15 @@
   .sidebar.sidebar-open { visibility: visible; }
 }
 
+.sidebar[aria-hidden="true"] { pointer-events: none; }
+.sidebar[aria-hidden="false"] { pointer-events: auto; }
+.mobile-menu { flex-shrink: 0; }
+
 @media (max-width: 520px) {
+  .outreach-health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .outreach-health-grid > div { min-height: 92px; padding: 13px; }
+  .campaign-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recipient-picker-list { grid-template-columns: 1fr; }
   .page-heading p { font-size: 12px; }
   .metric-label { font-size: 11px; }
   .metric-footnote { font-size: 10px; }

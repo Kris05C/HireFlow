@@ -1,16 +1,23 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/context'
 import { apiRequest } from './api/client'
 import { companyConfig } from './config'
 import { AppLayout } from './components/Layout'
-import { AuthPage } from './pages/AuthPage'
-import { PricingPage } from './pages/Pricing'
-import { CampaignsPage, CandidatesPage, FollowUpsPage, InterestedPage, JobsPage, SettingsPage } from './pages'
-import Dashboard from './pages/Dashboard'
 import './App.css'
 import './responsive.css'
+
+const AuthPage = lazy(() => import('./pages/AuthPage').then(({ AuthPage: page }) => ({ default: page })))
+const PricingPage = lazy(() => import('./pages/Pricing').then(({ PricingPage: page }) => ({ default: page })))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const WorkspacePages = lazy(() => import('./pages').then((module) => ({
+  default: function WorkspacePages({ page, ...props }) {
+    const Page = module[page]
+    return <Page {...props} />
+  },
+}))
+)
 
 const sampleIds = {
   'hireflow-jobs': new Set(['job-1', 'job-2', 'job-3', 'job-4', 'job-5', 'job-6', 'job-7']),
@@ -68,6 +75,7 @@ const mapCandidate = (candidate) => {
     source: candidate.source || 'candidate-consented-recruiter-entry',
     outreachConsent: Boolean(candidate.outreach_consent),
     retentionUntil: candidate.retention_until || null,
+    pipelineStatus: candidate.pipeline_status || 'New',
   }
 }
 const mapCampaign = (campaign) => ({
@@ -75,6 +83,7 @@ const mapCampaign = (campaign) => ({
   name: campaign.name,
   jobId: campaign.job_id,
   subject: campaign.subject,
+  body: campaign.body || '',
   status: campaign.status,
   audience: campaign.recipient_count || 0,
   date: formatDate(campaign.created_at),
@@ -140,6 +149,12 @@ function RoutedApp() {
   const [loadRevision, setLoadRevision] = useState(0)
   const [search, setSearch] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('hireflow-theme') || 'light')
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('hireflow-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     if (!auth.authRequired || auth.status !== 'authenticated') return undefined
@@ -262,6 +277,7 @@ function RoutedApp() {
         color: 'blue',
         source: 'candidate-consented-recruiter-entry',
         outreachConsent: Boolean(candidate.outreachConsent),
+        pipelineStatus: 'New',
       }
       recordLocalActivity('candidate.created', 'Added candidate profile with recorded discovery consent', 'candidate')
       return savedCandidate
@@ -282,6 +298,52 @@ function RoutedApp() {
     })
     await refreshServerDashboard()
     return mapCandidate(result.candidate)
+  }
+  const updateCandidateStatus = async (candidateId, status) => {
+    if (!auth.authRequired) {
+      const nextCandidates = candidates.map((item) => item.id === candidateId ? { ...item, pipelineStatus: status } : item)
+      setCandidates(nextCandidates)
+      recordLocalActivity('candidate.pipeline_status_updated', `Updated candidate pipeline status to ${status}`, 'candidate')
+      return nextCandidates.find((item) => item.id === candidateId)
+    }
+    const result = await apiRequest(`/workspace/candidates/${candidateId}/status`, { method: 'PATCH', body: { status } })
+    await refreshServerDashboard()
+    return mapCandidate(result.candidate)
+  }
+  const getCandidateNotes = async (candidateId) => {
+    if (!auth.authRequired) return []
+    const result = await apiRequest(`/workspace/candidates/${candidateId}/notes`)
+    return result.notes
+  }
+  const addCandidateNote = async (candidateId, body) => {
+    if (!auth.authRequired) return { id: `note-${Date.now()}`, body, created_at: new Date().toISOString(), author_name: profile.name || 'You' }
+    const result = await apiRequest(`/workspace/candidates/${candidateId}/notes`, { method: 'POST', body: { body } })
+    return result.note
+  }
+  const getCandidateFolders = async () => {
+    if (!auth.authRequired) return []
+    const result = await apiRequest('/workspace/candidate-folders')
+    return result.folders
+  }
+  const createCandidateFolder = async (name) => {
+    if (!auth.authRequired) return { id: `folder-${Date.now()}`, name, candidate_count: 0 }
+    const result = await apiRequest('/workspace/candidate-folders', { method: 'POST', body: { name } })
+    return result.folder
+  }
+  const addCandidateToFolder = async (folderId, candidateId) => {
+    if (!auth.authRequired) return { folder_id: folderId, candidate_id: candidateId }
+    const result = await apiRequest(`/workspace/candidate-folders/${folderId}/candidates/${candidateId}`, { method: 'POST' })
+    return result.membership
+  }
+  const getOutreachTemplates = async () => {
+    if (!auth.authRequired) return []
+    const result = await apiRequest('/workspace/outreach-templates')
+    return result.templates
+  }
+  const createOutreachTemplate = async (template) => {
+    if (!auth.authRequired) return { ...template, id: `template-${Date.now()}` }
+    const result = await apiRequest('/workspace/outreach-templates', { method: 'POST', body: template })
+    return result.template
   }
   const createCampaign = async (campaign) => {
     if (!auth.authRequired) {
@@ -304,6 +366,18 @@ function RoutedApp() {
     const result = await apiRequest(`/workspace/campaigns/${campaignId}`, { method: 'PATCH', body: campaign })
     await refreshServerDashboard()
     return mapCampaign(result.campaign)
+  }
+  const queueCampaign = async (campaignId, candidateIds) => {
+    if (!auth.authRequired) throw new Error('Queueing requires authenticated server mode; browser-only drafts cannot be queued safely.')
+    const idempotencyKey = globalThis.crypto?.randomUUID?.() || `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const result = await apiRequest(`/workspace/campaigns/${campaignId}/queue`, { method: 'POST', body: { idempotencyKey, ...(candidateIds?.length ? { candidateIds } : {}) } })
+    await refreshServerDashboard()
+    return result.campaign
+  }
+  const getCampaignRecipients = async (campaignId) => {
+    if (!auth.authRequired) return []
+    const result = await apiRequest(`/workspace/campaigns/${campaignId}/eligible-recipients`)
+    return result.recipients
   }
   const createFollowUp = async (followUp) => {
     if (!auth.authRequired) {
@@ -358,6 +432,7 @@ function RoutedApp() {
     campaigns: campaigns.length,
     interested: interested.length,
     followUpsDue: followUps.filter((item) => !item.completed).length,
+    outreach: { queued: 0, sending: 0, sent: 0, unsubscribed: 0 },
   }
   const counts = {
     candidateCount: dashboardCounts.candidates,
@@ -368,12 +443,14 @@ function RoutedApp() {
 
   if (auth.authRequired && auth.status === 'checking') return <main className="auth-loading" role="status">Checking your HireFlow session…</main>
   if (auth.authRequired && auth.status !== 'authenticated') {
-    return <Routes>
+    return <Suspense fallback={<main className="auth-loading" role="status">Loading HireFlow...</main>}><Routes>
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
       <Route path="/verify-email" element={<AuthPage mode="verify" />} />
+      <Route path="/forgot-password" element={<AuthPage mode="forgot" />} />
+      <Route path="/reset-password" element={<AuthPage mode="reset" />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    </Routes></Suspense>
   }
   const titleMap = {
     '/': [profile.name ? `Welcome, ${profile.name}` : 'Overview', 'Your hiring workspace at a glance.'],
@@ -400,6 +477,8 @@ function RoutedApp() {
       onSearch={setSearch}
       counts={counts}
       profile={profile}
+      theme={theme}
+      onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
       persistenceLabel={persistenceLabel}
       searchable={searchableRoutes.has(location.pathname)}
       sidebarOpen={sidebarOpen}
@@ -408,20 +487,24 @@ function RoutedApp() {
     >
       {dataError && <div className="workspace-error" role="alert">{dataError}<button type="button" onClick={() => { setDataError(''); setDataStatus('loading'); setLoadRevision((revision) => revision + 1) }}>Retry</button></div>}
       {auth.authRequired && dataStatus === 'loading' && <p className="workspace-loading" role="status">Loading workspace data…</p>}
+      <Suspense fallback={<p className="workspace-loading" role="status">Loading page...</p>}>
       <Routes>
         <Route path="/" element={<Dashboard profile={profile} jobs={jobs} followUps={followUps} activity={activity} counts={dashboardCounts} />} />
-        <Route path="/jobs" element={<JobsPage jobs={jobs} setJobs={setJobs} createJob={createJob} updateJob={updateJob} updateJobStatus={updateJobStatus} persistenceLabel={persistenceLabel} search={search} />} />
-        <Route path="/candidates" element={<CandidatesPage candidates={candidates} setCandidates={setCandidates} createCandidate={createCandidate} persistenceLabel={auth.authRequired ? persistenceLabel : 'In-memory only · cleared when this page reloads'} jobs={jobs} search={search} />} />
-        <Route path="/campaigns" element={<CampaignsPage campaigns={campaigns} setCampaigns={setCampaigns} createCampaign={createCampaign} updateCampaign={updateCampaign} persistenceLabel={persistenceLabel} jobs={jobs} search={search} />} />
-        <Route path="/interested" element={<InterestedPage candidates={candidates} jobs={jobs} interested={interested} setInterested={setInterested} updateInterestStatus={updateInterestStatus} search={search} />} />
-        <Route path="/follow-ups" element={<FollowUpsPage followUps={followUps} setFollowUps={setFollowUps} createFollowUp={createFollowUp} updateFollowUp={updateFollowUp} persistenceLabel={followUpPersistenceLabel} candidates={candidates} search={search} />} />
+        <Route path="/jobs" element={<WorkspacePages page="JobsPage" jobs={jobs} setJobs={setJobs} createJob={createJob} updateJob={updateJob} updateJobStatus={updateJobStatus} persistenceLabel={persistenceLabel} search={search} />} />
+        <Route path="/candidates" element={<WorkspacePages page="CandidatesPage" candidates={candidates} setCandidates={setCandidates} createCandidate={createCandidate} updateCandidateStatus={updateCandidateStatus} getCandidateNotes={getCandidateNotes} addCandidateNote={addCandidateNote} getCandidateFolders={getCandidateFolders} createCandidateFolder={createCandidateFolder} addCandidateToFolder={addCandidateToFolder} persistenceLabel={auth.authRequired ? persistenceLabel : 'In-memory only · cleared when this page reloads'} jobs={jobs} search={search} />} />
+        <Route path="/campaigns" element={<WorkspacePages page="CampaignsPage" campaigns={campaigns} setCampaigns={setCampaigns} createCampaign={createCampaign} updateCampaign={updateCampaign} queueCampaign={queueCampaign} getCampaignRecipients={getCampaignRecipients} getOutreachTemplates={getOutreachTemplates} createOutreachTemplate={createOutreachTemplate} persistenceLabel={persistenceLabel} jobs={jobs} search={search} />} />
+        <Route path="/interested" element={<WorkspacePages page="InterestedPage" candidates={candidates} jobs={jobs} interested={interested} setInterested={setInterested} updateInterestStatus={updateInterestStatus} search={search} />} />
+        <Route path="/follow-ups" element={<WorkspacePages page="FollowUpsPage" followUps={followUps} setFollowUps={setFollowUps} createFollowUp={createFollowUp} updateFollowUp={updateFollowUp} persistenceLabel={followUpPersistenceLabel} candidates={candidates} search={search} />} />
         <Route path="/pricing" element={<PricingPage initialSelection={auth.authRequired ? planSelection : undefined} onSelectPlan={auth.authRequired ? selectPlan : undefined} />} />
-        <Route path="/settings" element={<SettingsPage profile={profile} saveProfile={saveProfile} persistenceMode={auth.authRequired ? 'server' : 'browser'} signOut={auth.authRequired ? auth.signOut : null} />} />
+        <Route path="/settings" element={<WorkspacePages page="SettingsPage" profile={profile} saveProfile={saveProfile} persistenceMode={auth.authRequired ? 'server' : 'browser'} signOut={auth.authRequired ? auth.signOut : null} theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/register" element={<Navigate to="/" replace />} />
         <Route path="/verify-email" element={<Navigate to="/" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </AppLayout>
   )
 }

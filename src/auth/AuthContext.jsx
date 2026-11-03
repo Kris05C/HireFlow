@@ -104,6 +104,8 @@ export function AuthProvider({ children }) {
 
   const verifyEmail = async (token) => apiRequest('/auth/verify-email', { method: 'POST', body: { token } })
   const resendVerification = async (email) => apiRequest('/auth/verification/resend', { method: 'POST', body: { email } })
+  const requestPasswordReset = async (email) => apiRequest('/auth/password-reset/request', { method: 'POST', body: { email } })
+  const completePasswordReset = async (token, password) => apiRequest('/auth/password-reset/complete', { method: 'POST', body: { token, password } })
 
   const saveProfile = async (nextProfile) => {
     const result = await apiRequest('/workspace/profile', {
@@ -115,7 +117,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ authRequired, status, profile, workspaceRole, backendError, signIn, register, signOut, saveProfile, verifyEmail, resendVerification }}>
+    <AuthContext.Provider value={{ authRequired, status, profile, workspaceRole, backendError, signIn, register, signOut, saveProfile, verifyEmail, resendVerification, requestPasswordReset, completePasswordReset }}>
       {children}
     </AuthContext.Provider>
   )

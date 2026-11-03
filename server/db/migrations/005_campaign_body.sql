@@ -1,0 +1,1 @@
+ALTER TABLE campaigns ADD COLUMN body text NOT NULL DEFAULT '';
