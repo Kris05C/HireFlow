@@ -9,6 +9,26 @@ const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1)
 const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, ' ')
 const locationKey = (value) => normalizeText(value).toLocaleLowerCase()
 const includesQuery = (value, query) => normalizeText(value).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+const builtInCampaignTemplates = [
+  {
+    id: 'built-in-introduction',
+    name: 'Role introduction',
+    subject: 'An opportunity that may be a good fit',
+    body: 'Hello,\n\nWe came across your profile and thought you may be interested in the {jobTitle} opportunity. Your experience looks relevant to what the team is building.\n\nIf you would like to learn more, reply to this email and we will be happy to share the details.\n\nBest,\nThe hiring team',
+  },
+  {
+    id: 'built-in-follow-up',
+    name: 'Friendly follow-up',
+    subject: 'Following up about the {jobTitle} opportunity',
+    body: 'Hello,\n\nI wanted to follow up on the {jobTitle} opportunity we shared. If the role is relevant to your goals, we would be glad to answer your questions and discuss the next steps.\n\nIf you are not interested, no action is needed.\n\nBest,\nThe hiring team',
+  },
+  {
+    id: 'built-in-interview',
+    name: 'Interview invitation',
+    subject: 'Next steps for the {jobTitle} opportunity',
+    body: 'Hello,\n\nThank you for your interest in the {jobTitle} opportunity. We would like to invite you to the next step in our recruitment process.\n\nPlease reply with a few suitable times, and we will coordinate the details with you.\n\nBest,\nThe hiring team',
+  },
+]
 
 export function JobsPage({ jobs, setJobs, createJob, updateJob, updateJobStatus, persistenceLabel, search }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -351,6 +371,7 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [templates, setTemplates] = useState([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [templateName, setTemplateName] = useState('')
   const [templateSaving, setTemplateSaving] = useState(false)
   const [queueing, setQueueing] = useState('')
@@ -388,8 +409,26 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
   }
   const openModal = () => {
     setForm({ name: '', jobId: activeJobs[0]?.id || '', subject: '', body: '' })
+    setSelectedTemplateId('')
+    setTemplateName('')
     setError('')
     setShowModal(true)
+  }
+  const applyTemplate = (templateId) => {
+    setSelectedTemplateId(templateId)
+    if (templateId === 'manual') {
+      setForm((current) => ({ ...current, subject: '', body: '' }))
+      return
+    }
+    const template = [...builtInCampaignTemplates, ...templates].find((item) => item.id === templateId)
+    if (!template) return
+    const jobTitle = selectedJob?.title || 'the open role'
+    setForm((current) => ({
+      ...current,
+      subject: template.subject.replaceAll('{jobTitle}', jobTitle),
+      body: template.body.replaceAll('{jobTitle}', jobTitle),
+    }))
+    setError('')
   }
   const saveTemplate = async (event) => {
     event.preventDefault()
@@ -457,7 +496,7 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
           return <article className="campaign-card" key={campaign.id}>
             <div className={`campaign-card-art art-${index % 3}`}><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="art-center"><Icon name={index % 2 ? 'sparkle' : 'send'} size={23} /></div><span className="art-count"><Icon name="users" size={14} />{campaign.audience} people</span></div>
             <div className="campaign-card-content"><div className="campaign-card-status"><StatusBadge status={campaign.status} /><span>{campaign.date}</span></div><h3>{campaign.name}</h3><p>{job?.title || 'Role unavailable'}</p><div className="campaign-subject"><Icon name="mail" size={15} /><span>{campaign.subject}</span></div>
-              <button className="campaign-preview-button" onClick={() => { setForm({ name: campaign.name, jobId: campaign.jobId, subject: campaign.subject, body: campaign.body || '' }); setError(''); setShowModal(true); setPreview(campaign); loadRecipients(campaign) }}>{campaign.status === 'Draft' ? 'Edit draft' : 'View campaign'} <Icon name="arrowRight" size={15} /></button>
+              <button className="campaign-preview-button" onClick={() => { setForm({ name: campaign.name, jobId: campaign.jobId, subject: campaign.subject, body: campaign.body || '' }); setSelectedTemplateId(''); setError(''); setShowModal(true); setPreview(campaign); loadRecipients(campaign) }}>{campaign.status === 'Draft' ? 'Edit draft' : 'View campaign'} <Icon name="arrowRight" size={15} /></button>
               {campaign.status === 'Draft' && <Button variant="secondary" onClick={() => handleQueue(campaign)} disabled={queueing === campaign.id}>{queueing === campaign.id ? 'Queueing…' : 'Queue safely'}</Button>}
             </div>
           </article>
@@ -468,7 +507,7 @@ export function CampaignsPage({ campaigns, setCampaigns, createCampaign, updateC
         <form className="modal-form campaign-form" onSubmit={submitCampaign}>
           <div className="form-grid"><FormField label="Campaign name"><input autoFocus={!preview} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Design talent — November" required readOnly={!canEditPreview} /></FormField>
             <FormField label="Related job"><select value={form.jobId} onChange={(event) => setForm((current) => ({ ...current, jobId: event.target.value }))} required disabled={!canEditPreview}>{activeJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}</select></FormField></div>
-          <FormField label="Saved template"><select value="" onChange={(event) => { const template = templates.find((item) => item.id === event.target.value); if (template) setForm((current) => ({ ...current, subject: template.subject, body: template.body })) }} disabled={!canEditPreview}><option value="">Select a template</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></FormField>
+          <FormField label="Email format"><select value={selectedTemplateId} onChange={(event) => applyTemplate(event.target.value)} disabled={!canEditPreview}><option value="">Choose a ready-made format</option><option value="manual">Write manually</option><optgroup label="Built-in formats">{builtInCampaignTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</optgroup>{templates.length > 0 && <optgroup label="Saved workspace templates">{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</optgroup>}</select></FormField>
           <FormField label="Email subject"><input value={form.subject} onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))} placeholder="A role we thought you'd love" required readOnly={!canEditPreview} /></FormField>
           <FormField label="Message"><textarea value={form.body} onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} placeholder="Write a respectful, consent-based message." rows={5} maxLength={10000} readOnly={!canEditPreview} /></FormField>
           {preview && canEditPreview && <section className="recipient-picker" aria-labelledby="recipient-picker-title"><div className="recipient-picker-heading"><div><h3 id="recipient-picker-title">Eligible recipients</h3><p>Only candidates with current consent, valid retention, and no unsubscribe suppression appear.</p></div><span>{loadingRecipients ? 'Loading…' : `${selectedRecipientIds.length} selected`}</span></div>{!loadingRecipients && recipients.length > 0 && <div className="recipient-picker-list">{recipients.map((recipient) => <label key={recipient.id}><input type="checkbox" checked={selectedRecipientIds.includes(recipient.id)} onChange={(event) => setSelectedRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span><strong>{recipient.full_name}</strong><small>{recipient.role_title} · {recipient.location}</small></span></label>)}</div>}{!loadingRecipients && !recipients.length && <p className="muted-cell">No eligible recipients are currently available.</p>}</section>}
